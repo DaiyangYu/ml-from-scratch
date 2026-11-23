@@ -1,0 +1,47 @@
+# 典型的错误写法。每一项是对参考实现的一处替换；`uv run drill verify` 会确认测试能拦住它们。
+
+[[mutant]]
+name = "同分的样本没有取平均名次"
+old = "ranks[order] = np.repeat(average_rank, ends - starts)"
+new = "ranks[order] = np.arange(1, n + 1)"
+
+[[mutant]]
+name = "按分数从高到低排名"
+old = 'order = np.argsort(scores, kind="stable")'
+new = 'order = np.argsort(-scores, kind="stable")'
+
+[[mutant]]
+name = "减去的是 n_pos(n_pos-1)/2"
+old = "n_pos * (n_pos + 1) / 2"
+new = "n_pos * (n_pos - 1) / 2"
+
+[[mutant]]
+name = "分母用了正样本数乘样本总数"
+old = "/ (n_pos * n_neg))"
+new = "/ (n_pos * n))"
+
+[[mutant]]
+name = "加的是负样本的名次"
+old = "ranks[positive].sum()"
+new = "ranks[~positive].sum()"
+
+[[mutant]]
+name = "用广播两两比较正负样本对（结果正确，但内存是平方级）"
+old = '    order = np.argsort(scores, kind="stable")'
+new = '''    positive_scores, negative_scores = scores[labels == 1], scores[labels != 1]
+    higher = (positive_scores[:, None] > negative_scores[None, :]).sum()
+    equal = (positive_scores[:, None] == negative_scores[None, :]).sum()
+    return float((higher + 0.5 * equal) / (len(positive_scores) * len(negative_scores)))
+    order = np.argsort(scores, kind="stable")'''
+
+[[mutant]]
+name = "GAUC 对各用户简单平均，没有按样本数加权"
+old = "weight = len(user_labels)"
+new = "weight = 1"
+
+[[mutant]]
+name = "GAUC 把只有一类样本的用户按 0.5 计入"
+old = "            continue  # 只有一类样本的用户没有正负样本对，AUC 无定义：跳过，也不计入权重"
+new = """            weighted_sum += 0.5 * len(user_labels)
+            total_weight += len(user_labels)
+            continue"""

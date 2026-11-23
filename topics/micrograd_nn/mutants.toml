@@ -1,0 +1,71 @@
+# 典型的错误写法。每一项是对参考实现的一处替换；`uv run drill verify` 会确认测试能拦住它们。
+
+[[mutant]]
+name = "最后一层也加了非线性"
+old = "nonlin=i != len(nouts) - 1"
+new = "nonlin=True"
+
+[[mutant]]
+name = "所有层都不加非线性"
+old = "nonlin=i != len(nouts) - 1"
+new = "nonlin=False"
+
+[[mutant]]
+name = "加权求和漏了偏置"
+old = "zip(self.w, x)), self.b)"
+new = "zip(self.w, x)), Value(0.0))"
+
+[[mutant]]
+name = "parameters 漏了偏置"
+old = "return self.w + [self.b]"
+new = "return self.w"
+
+[[mutant]]
+name = "parameters 返回数值的副本而不是对象本身"
+old = "return self.w + [self.b]"
+new = "return [Value(p.data) for p in self.w + [self.b]]"
+
+[[mutant]]
+name = "zero_grad 没有真正清零"
+old = "            p.grad = 0.0"
+new = "            pass"
+
+[[mutant]]
+name = "只有一个输出时仍返回列表"
+old = "return out[0] if len(out) == 1 else out"
+new = "return out"
+
+[[mutant]]
+name = "没有把 kwargs 传给神经元"
+old = "Neuron(nin, **kwargs)"
+new = "Neuron(nin)"
+
+[[mutant]]
+name = "每一层的输入维度都用了 nin（zip 会悄悄截断，不报错）"
+old = "Layer(sizes[i], sizes[i + 1], nonlin"
+new = "Layer(nin, sizes[i + 1], nonlin"
+
+[[mutant]]
+name = "权重全部初始化为同一个值"
+old = "Value(random.uniform(-1, 1))"
+new = "Value(0.5)"
+
+[[mutant]]
+name = "权重只在 [0, 1] 上取值"
+old = "random.uniform(-1, 1)"
+new = "random.uniform(0, 1)"
+
+[[mutant]]
+name = "激活函数用了 tanh"
+old = "act.relu()"
+new = "act.tanh()"
+
+[[mutant]]
+name = "同一层的神经元是同一个对象"
+old = "self.neurons = [Neuron(nin, **kwargs) for _ in range(nout)]"
+new = "self.neurons = [Neuron(nin, **kwargs)] * nout"
+
+[[mutant]]
+name = "nonlin 的默认值是 False"
+old = "def __init__(self, nin, nonlin=True):"
+new = "def __init__(self, nin, nonlin=False):"

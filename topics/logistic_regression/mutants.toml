@@ -1,0 +1,45 @@
+# 典型的错误写法。每一项是对参考实现的一处替换；`uv run drill verify` 会确认测试能拦住它们。
+
+[[mutant]]
+name = "梯度的符号写反：标签减预测值"
+old = "error = p - y "
+new = "error = y - p "
+
+[[mutant]]
+name = "权重的梯度没有除以样本数"
+old = "grad_w = X.T @ error / n "
+new = "grad_w = X.T @ error     "
+
+[[mutant]]
+name = "没有更新偏置"
+old = "            self.b -= self.lr * grad_b\n"
+new = ""
+
+[[mutant]]
+name = "训练时漏掉 sigmoid（变成线性回归的梯度）"
+old = "p = sigmoid(logits) "
+new = "p = logits          "
+
+[[mutant]]
+name = "再次 fit 时接着上一次的参数训练"
+old = """        self.w = np.zeros(d)  # 每次 fit 都从 0 开始
+        self.b = 0.0
+"""
+new = """        if self.w is None:
+            self.w = np.zeros(d)
+"""
+
+[[mutant]]
+name = "预测时漏加偏置"
+old = "return sigmoid(np.asarray(X, dtype=float) @ self.w + self.b)"
+new = "return sigmoid(np.asarray(X, dtype=float) @ self.w)"
+
+[[mutant]]
+name = "predict 返回概率而不是 0 或 1"
+old = "return (self.predict_proba(X) >= 0.5).astype(int)"
+new = "return self.predict_proba(X)"
+
+[[mutant]]
+name = "sigmoid 写成 exp(z) / (1 + exp(z))，输入很大时得到 nan"
+old = "return np.exp(-np.logaddexp(0.0, -z))"
+new = "return np.exp(z) / (1.0 + np.exp(z))"

@@ -1,0 +1,41 @@
+# 典型的错误写法。每一项是对参考实现的一处替换；`uv run drill verify` 会确认测试能拦住它们。
+
+[[mutant]]
+name = "Recall 的分母用了 k（算成了 Precision@K）"
+old = "return hits / len(relevant)"
+new = "return hits / k"
+
+[[mutant]]
+name = "Recall 没有截断到前 k 个"
+old = "top_k = ranked_items[:k]"
+new = "top_k = ranked_items"
+
+[[mutant]]
+name = "DCG 没有截断到前 k 个"
+old = "enumerate(ranked_items[:k])"
+new = "enumerate(ranked_items)"
+
+[[mutant]]
+name = "DCG 没有按位置折损，只数了命中个数"
+old = "1.0 / math.log2(index + 2) for index, item"
+new = "1.0 for index, item"
+
+[[mutant]]
+name = "DCG 的位置错开了一位"
+old = "1.0 / math.log2(index + 2) for index, item"
+new = "1.0 / math.log2(index + 3) for index, item"
+
+[[mutant]]
+name = "理想排序的长度取 k，没有考虑相关物品不足 k 个"
+old = "ideal_hits = min(k, len(relevant))"
+new = "ideal_hits = k"
+
+[[mutant]]
+name = "理想排序的长度取相关物品总数，没有截断到 k"
+old = "ideal_hits = min(k, len(relevant))"
+new = "ideal_hits = len(relevant)"
+
+[[mutant]]
+name = "没有除以 IDCG，返回的是 DCG"
+old = "return dcg / idcg"
+new = "return dcg"

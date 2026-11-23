@@ -26,7 +26,7 @@
 ## 不要求
 
 - 张量、广播、批量运算
-- `Neuron`、`Layer`、`MLP` 等神经网络封装
+- `Neuron`、`Layer`、`MLP` 等神经网络封装（见题目 micrograd_nn）
 - 重复调用 `backward()` 时的清零逻辑
 
 ## 检验方式

@@ -9,6 +9,10 @@
 | 题目 | 内容 | 建议用时 |
 | --- | --- | --- |
 | [micrograd](topics/micrograd) | 标量自动微分 | 30 分钟 |
+| [micrograd_nn](topics/micrograd_nn) | 用自动微分引擎搭神经元、层和多层感知机 | 15 分钟 |
+| [logistic_regression](topics/logistic_regression) | 用 numpy 实现逻辑回归与梯度下降 | 15 分钟 |
+| [auc](topics/auc) | AUC 与 GAUC | 15 分钟 |
+| [topk_metrics](topics/topk_metrics) | Recall@K 与 NDCG@K | 10 分钟 |
 | [mf](topics/mf) | Embedding 与矩阵分解 | 5 分钟 |
 | [skipgram](topics/skipgram) | Word2Vec Skip-gram 与负采样损失 | 10 分钟 |
 | [fm](topics/fm) | 因子分解机 | 15 分钟 |
@@ -17,6 +21,7 @@
 | [transformer_block](topics/transformer_block) | 缩放点积注意力、多头注意力、Pre-LN 编码器块 | 30 分钟 |
 | [din_attention](topics/din_attention) | DIN 的注意力单元 | 10 分钟 |
 | [dssm](topics/dssm) | DSSM 双塔 | 10 分钟 |
+| [inbatch_softmax](topics/inbatch_softmax) | 双塔的批内负采样损失与 logQ 纠偏 | 10 分钟 |
 | [dcn_cross](topics/dcn_cross) | DCN-v2 的交叉层 | 5 分钟 |
 | [mmoe](topics/mmoe) | MMoE 的专家与门控 | 10 分钟 |
 | [wide_deep](topics/wide_deep) | Wide & Deep | 10 分钟 |

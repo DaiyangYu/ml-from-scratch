@@ -1,0 +1,41 @@
+# 典型的错误写法。每一项是对参考实现的一处替换；`uv run drill verify` 会确认测试能拦住它们。
+
+[[mutant]]
+name = "漏掉温度"
+old = "logits = user_vecs @ item_vecs.T / temperature"
+new = "logits = user_vecs @ item_vecs.T"
+
+[[mutant]]
+name = "行列弄反：每一列对应一个用户（变成物品选用户）"
+old = "logits = user_vecs @ item_vecs.T / temperature"
+new = "logits = item_vecs @ user_vecs.T / temperature"
+
+[[mutant]]
+name = "函数内部做了 L2 归一化"
+old = "logits = user_vecs @ item_vecs.T / temperature"
+new = "logits = F.normalize(user_vecs, dim=-1) @ F.normalize(item_vecs, dim=-1).T / temperature"
+
+[[mutant]]
+name = "纠偏的符号写反：加上 log p"
+old = "logits = logits - item_log_probs.unsqueeze(0)"
+new = "logits = logits + item_log_probs.unsqueeze(0)"
+
+[[mutant]]
+name = "纠偏减在了行上（每个用户减一个常数，对损失没有影响）"
+old = "logits = logits - item_log_probs.unsqueeze(0)"
+new = "logits = logits - item_log_probs.unsqueeze(1)"
+
+[[mutant]]
+name = "只修正负样本，没有修正对角线上的正样本"
+old = "logits = logits - item_log_probs.unsqueeze(0)"
+new = "logits = logits - item_log_probs.unsqueeze(0) * (1 - torch.eye(logits.size(0), dtype=logits.dtype, device=logits.device))"
+
+[[mutant]]
+name = "修正量也除以了温度"
+old = "logits = logits - item_log_probs.unsqueeze(0)"
+new = "logits = logits - item_log_probs.unsqueeze(0) / temperature"
+
+[[mutant]]
+name = "对 batch 求和而不是取平均"
+old = "return F.cross_entropy(logits, labels)"
+new = 'return F.cross_entropy(logits, labels, reduction="sum")'
