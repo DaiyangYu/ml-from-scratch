@@ -1,0 +1,42 @@
+# 典型的错误写法。每一项是对参考实现的一处替换；`uv run drill verify` 会确认测试能拦住它们。
+
+[[mutant]]
+name = "忘了因果 mask（能看到未来的 item）"
+old = "x = block(x, causal)"
+new = "x = block(x)"
+
+[[mutant]]
+name = "把 padding mask 乘进注意力 mask（左侧 padding 时得到 NaN）"
+old = "causal = torch.tril(torch.ones(L, L, device=seq.device)).view(1, 1, L, L)"
+new = "causal = torch.tril(torch.ones(L, L, device=seq.device)).view(1, 1, L, L) * (seq != 0).view(B, 1, 1, L)"
+
+[[mutant]]
+name = "漏掉位置编码"
+old = "x = self.item_emb(seq) + self.pos_emb(pos)"
+new = "x = self.item_emb(seq)"
+
+[[mutant]]
+name = "取了第一个位置的表示打分"
+old = "seq_out = self.forward(seq)[:, -1]"
+new = "seq_out = self.forward(seq)[:, 0]"
+
+[[mutant]]
+name = "因果 mask 写成上三角（只能看到未来）"
+old = "causal = torch.tril("
+new = "causal = torch.triu("
+
+[[mutant]]
+name = "Block 之后没有把 padding 位置置零"
+old = """            x = block(x, causal)
+            x = x * keep"""
+new = """            x = block(x, causal)"""
+
+[[mutant]]
+name = "加完位置编码后没有把 padding 位置置零"
+old = "        x = x * keep  # 进入第一个 Block 之前"
+new = "        x = x + 0  # 进入第一个 Block 之前"
+
+[[mutant]]
+name = "漏掉最后的 LayerNorm"
+old = "return self.ln(x)"
+new = "return x"

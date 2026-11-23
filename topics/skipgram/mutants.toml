@@ -1,0 +1,36 @@
+# 典型的错误写法。每一项是对参考实现的一处替换；`uv run drill verify` 会确认测试能拦住它们。
+
+[[mutant]]
+name = "负样本项的符号写反"
+old = "F.logsigmoid(-neg_score)"
+new = "F.logsigmoid(neg_score)"
+
+[[mutant]]
+name = "正样本项的符号写反"
+old = "F.logsigmoid(pos_score)"
+new = "F.logsigmoid(-pos_score)"
+
+[[mutant]]
+name = "负样本项对 K 取平均而不是求和"
+old = "F.logsigmoid(-neg_score).sum(dim=-1)"
+new = "F.logsigmoid(-neg_score).mean(dim=-1)"
+
+[[mutant]]
+name = "正样本的上下文词查了中心词表"
+old = "v_pos = self.context_emb(pos_context)"
+new = "v_pos = self.center_emb(pos_context)"
+
+[[mutant]]
+name = "负样本词查了中心词表"
+old = "v_neg = self.context_emb(neg_contexts)"
+new = "v_neg = self.center_emb(neg_contexts)"
+
+[[mutant]]
+name = "中心词查了上下文表"
+old = "u = self.center_emb(center)"
+new = "u = self.context_emb(center)"
+
+[[mutant]]
+name = "漏掉负样本项"
+old = "return (pos_loss + neg_loss).mean()"
+new = "return pos_loss.mean()"

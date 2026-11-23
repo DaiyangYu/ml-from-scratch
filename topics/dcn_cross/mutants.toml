@@ -1,0 +1,31 @@
+# 典型的错误写法。每一项是对参考实现的一处替换；`uv run drill verify` 会确认测试能拦住它们。
+
+[[mutant]]
+name = "逐元素相乘的对象写成上一层输出而不是 x0"
+old = "return x0 * self.linear(xl) + xl"
+new = "return xl * self.linear(xl) + xl"
+
+[[mutant]]
+name = "漏掉残差"
+old = "return x0 * self.linear(xl) + xl"
+new = "return x0 * self.linear(xl)"
+
+[[mutant]]
+name = "残差加的是 x0 而不是上一层输出"
+old = "return x0 * self.linear(xl) + xl"
+new = "return x0 * self.linear(xl) + x0"
+
+[[mutant]]
+name = "线性变换作用在 x0 上"
+old = "return x0 * self.linear(xl) + xl"
+new = "return xl * self.linear(x0) + xl"
+
+[[mutant]]
+name = "交叉网络每层传入的 x0 换成了上一层输出"
+old = "xl = layer(x0, xl)"
+new = "xl = layer(xl, xl)"
+
+[[mutant]]
+name = "交叉网络没有逐层传递，每层都从 x0 重新算"
+old = "xl = layer(x0, xl)"
+new = "xl = layer(x0, x0)"

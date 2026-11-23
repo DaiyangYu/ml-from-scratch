@@ -1,0 +1,44 @@
+# 典型的错误写法。每一项是对参考实现的一处替换；`uv run drill verify` 会确认测试能拦住它们。
+
+[[mutant]]
+name = "论文写法：更新门的方向写反（z 乘到了候选状态上）"
+old = "return z * h + (1 - z) * h_tilde"
+new = "return (1 - z) * h + z * h_tilde"
+
+[[mutant]]
+name = "论文写法：重置门没有作用到旧状态上"
+old = "self.Wh(torch.cat([x, r * h], dim=-1))"
+new = "self.Wh(torch.cat([x, h], dim=-1))"
+
+[[mutant]]
+name = "论文写法：重置门乘到了输入上"
+old = "self.Wh(torch.cat([x, r * h], dim=-1))"
+new = "self.Wh(torch.cat([r[:, :1] * x, h], dim=-1))"
+
+[[mutant]]
+name = "论文写法：候选状态用了 sigmoid"
+old = "h_tilde = torch.tanh("
+new = "h_tilde = torch.sigmoid("
+
+[[mutant]]
+name = "PyTorch 写法：门的顺序拼成 z、r、n"
+old = """        i_r, i_z, i_n = gi.chunk(3, dim=-1)
+        h_r, h_z, h_n = gh.chunk(3, dim=-1)"""
+new = """        i_z, i_r, i_n = gi.chunk(3, dim=-1)
+        h_z, h_r, h_n = gh.chunk(3, dim=-1)"""
+
+[[mutant]]
+name = "PyTorch 写法：照搬论文写法，让 r 先乘旧状态再做线性变换"
+old = "n = torch.tanh(i_n + r * h_n)"
+new = "n = torch.tanh(i_n + (r * h) @ self.weight_hh.chunk(3, dim=0)[2].T + self.bias_hh.chunk(3)[2])"
+
+[[mutant]]
+name = "PyTorch 写法：隐状态侧的偏置 b_hn 放到了 r 的乘法之外"
+old = "n = torch.tanh(i_n + r * h_n)"
+new = """b_hn = self.bias_hh.chunk(3)[2]
+        n = torch.tanh(i_n + r * (h_n - b_hn) + b_hn)"""
+
+[[mutant]]
+name = "PyTorch 写法：融合时 z 乘到了候选状态上"
+old = "return (1 - z) * n + z * h"
+new = "return z * n + (1 - z) * h"

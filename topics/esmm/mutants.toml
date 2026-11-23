@@ -1,0 +1,46 @@
+# 典型的错误写法。每一项是对参考实现的一处替换；`uv run drill verify` 会确认测试能拦住它们。
+
+[[mutant]]
+name = "pCTCVR 写成两个概率相加"
+old = "return p_ctr, p_cvr, p_ctr * p_cvr"
+new = "return p_ctr, p_cvr, p_ctr + p_cvr"
+
+[[mutant]]
+name = "第三个返回值直接返回了 pCVR"
+old = "return p_ctr, p_cvr, p_ctr * p_cvr"
+new = "return p_ctr, p_cvr, p_cvr"
+
+[[mutant]]
+name = "CVR 也用了 CTR 塔"
+old = "p_cvr = self.cvr_tower(x).squeeze(-1)"
+new = "p_cvr = self.ctr_tower(x).squeeze(-1)"
+
+[[mutant]]
+name = "输出没有去掉最后一维，形状是 [B, 1]"
+old = "p_ctr = self.ctr_tower(x).squeeze(-1)"
+new = "p_ctr = self.ctr_tower(x)"
+
+[[mutant]]
+name = "CTCVR 这一项的标签用成了点击标签"
+old = "F.binary_cross_entropy(p_ctcvr, conversion.float())"
+new = "F.binary_cross_entropy(p_ctcvr, click.float())"
+
+[[mutant]]
+name = "损失漏掉 CTR 这一项"
+old = "return ctr_loss + ctcvr_loss"
+new = "return ctcvr_loss"
+
+[[mutant]]
+name = "损失漏掉 CTCVR 这一项（CVR 塔得不到梯度）"
+old = "return ctr_loss + ctcvr_loss"
+new = "return ctr_loss"
+
+[[mutant]]
+name = "CTCVR 这一项只在点击样本上计算"
+old = "ctcvr_loss = F.binary_cross_entropy(p_ctcvr, conversion.float())"
+new = "ctcvr_loss = F.binary_cross_entropy(p_ctcvr[click.bool()], conversion.float()[click.bool()]) if click.bool().any() else p_ctcvr.sum() * 0"
+
+[[mutant]]
+name = "损失对 batch 求和而不是取平均"
+old = "ctr_loss = F.binary_cross_entropy(p_ctr, click.float())"
+new = "ctr_loss = F.binary_cross_entropy(p_ctr, click.float(), reduction=\"sum\")"

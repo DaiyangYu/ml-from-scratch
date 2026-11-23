@@ -1,0 +1,41 @@
+# 典型的错误写法。每一项是对参考实现的一处替换；`uv run drill verify` 会确认测试能拦住它们。
+
+[[mutant]]
+name = "差的方向写反（历史减目标）"
+old = "[t, history, t - history, t * history]"
+new = "[t, history, history - t, t * history]"
+
+[[mutant]]
+name = "拼接顺序写成历史在前、目标在后"
+old = "[t, history, t - history, t * history]"
+new = "[history, t, t - history, t * history]"
+
+[[mutant]]
+name = "差和积的位置对调"
+old = "[t, history, t - history, t * history]"
+new = "[t, history, t * history, t - history]"
+
+[[mutant]]
+name = "对分数做了 softmax 归一化"
+old = "return (scores.unsqueeze(-1) * history).sum(dim=1)"
+new = "return (torch.softmax(scores, dim=-1).unsqueeze(-1) * history).sum(dim=1)"
+
+[[mutant]]
+name = "没有屏蔽 padding 位置"
+old = "scores = scores.masked_fill(mask == 0, 0.0)"
+new = "scores = scores + 0.0"
+
+[[mutant]]
+name = "照搬 softmax 版的做法，把 padding 位置的分数填成负无穷"
+old = "scores = scores.masked_fill(mask == 0, 0.0)"
+new = "scores = scores.masked_fill(mask == 0, float(\"-inf\"))"
+
+[[mutant]]
+name = "用分数加权的是目标向量而不是历史向量"
+old = "return (scores.unsqueeze(-1) * history).sum(dim=1)"
+new = "return (scores.unsqueeze(-1) * t).sum(dim=1)"
+
+[[mutant]]
+name = "加权后取平均而不是求和"
+old = "return (scores.unsqueeze(-1) * history).sum(dim=1)"
+new = "return (scores.unsqueeze(-1) * history).mean(dim=1)"

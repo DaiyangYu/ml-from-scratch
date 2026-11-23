@@ -1,0 +1,36 @@
+# 典型的错误写法。每一项是对参考实现的一处替换；`uv run drill verify` 会确认测试能拦住它们。
+
+[[mutant]]
+name = "两项相减的顺序写反"
+old = "(square_of_sum - sum_of_square)"
+new = "(sum_of_square - square_of_sum)"
+
+[[mutant]]
+name = "漏掉系数 0.5"
+old = "cross = 0.5 * (square_of_sum"
+new = "cross = (square_of_sum"
+
+[[mutant]]
+name = "没有减去平方和（把自身与自身的交叉也算了进去）"
+old = "(square_of_sum - sum_of_square)"
+new = "(square_of_sum)"
+
+[[mutant]]
+name = "漏掉全局偏置 w0"
+old = "return self.w0 + linear_part + cross"
+new = "return linear_part + cross"
+
+[[mutant]]
+name = "漏掉一阶项"
+old = "return self.w0 + linear_part + cross"
+new = "return self.w0 + cross"
+
+[[mutant]]
+name = "先平方再求和与先求和再平方写成同一个"
+old = "square_of_sum = v.sum(dim=1).pow(2) "
+new = "square_of_sum = v.pow(2).sum(dim=1) "
+
+[[mutant]]
+name = "在隐维度上求和而不是在特征维度上求和"
+old = "square_of_sum = v.sum(dim=1).pow(2) "
+new = "square_of_sum = v.sum(dim=2, keepdim=True).pow(2).expand(-1, -1, v.size(2)).sum(dim=1) "

@@ -1,0 +1,53 @@
+# 典型的错误写法。每一项是对参考实现的一处替换；`uv run drill verify` 会确认测试能拦住它们。
+
+[[mutant]]
+name = "把注意力分数乘在 PyTorch 的 z 上再套 PyTorch 的融合式（方向反了：分数为 0 时旧状态被完全覆盖）"
+old = """        u = att_score * (1 - z)
+        return (1 - u) * h + u * n"""
+new = """        z = att_score * z
+        return (1 - z) * n + z * h"""
+
+[[mutant]]
+name = "没有把 z 换算成论文的 u，直接用 a * z 当作取新状态的比例"
+old = "u = att_score * (1 - z)"
+new = "u = att_score * z"
+
+[[mutant]]
+name = "官方 TensorFlow 代码的写法：用 1 - a 缩放保留旧状态的比例"
+old = """        u = att_score * (1 - z)
+        return (1 - u) * h + u * n"""
+new = """        z = (1.0 - att_score) * z
+        return z * h + (1 - z) * n"""
+
+[[mutant]]
+name = "写成 AGRU：用注意力分数直接取代更新门"
+old = "u = att_score * (1 - z)"
+new = "u = att_score.expand_as(z)"
+
+[[mutant]]
+name = "把注意力分数乘在整个新状态上"
+old = "return (1 - u) * h + u * n"
+new = "return att_score * ((1 - z) * n + z * h)"
+
+[[mutant]]
+name = "写成 AIGRU：用注意力分数缩放输入，更新门不变"
+old = """        u = att_score * (1 - z)
+        return (1 - u) * h + u * n"""
+new = """        gi = (att_score * x) @ self.weight_ih.T + self.bias_ih
+        i_r, i_z, i_n = gi.chunk(3, dim=-1)
+        r = torch.sigmoid(i_r + h_r)
+        z = torch.sigmoid(i_z + h_z)
+        n = torch.tanh(i_n + r * h_n)
+        return (1 - z) * n + z * h"""
+
+[[mutant]]
+name = "门的顺序拼成 z、r、n"
+old = """        i_r, i_z, i_n = gi.chunk(3, dim=-1)
+        h_r, h_z, h_n = gh.chunk(3, dim=-1)"""
+new = """        i_z, i_r, i_n = gi.chunk(3, dim=-1)
+        h_z, h_r, h_n = gh.chunk(3, dim=-1)"""
+
+[[mutant]]
+name = "重置门乘在旧状态上而不是它的线性变换上"
+old = "n = torch.tanh(i_n + r * h_n)"
+new = "n = torch.tanh(i_n + (r * h) @ self.weight_hh.chunk(3, dim=0)[2].T + self.bias_hh.chunk(3)[2])"

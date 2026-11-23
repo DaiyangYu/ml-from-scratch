@@ -1,0 +1,36 @@
+# 典型的错误写法。每一项是对参考实现的一处替换；`uv run drill verify` 会确认测试能拦住它们。
+
+[[mutant]]
+name = "Deep 第一层的输入维度按特征 id 总数算（混淆了词表大小与特征域个数）"
+old = "nn.Linear(n_fields * emb_dim, hidden)"
+new = "nn.Linear(num_features * emb_dim, hidden)"
+
+[[mutant]]
+name = "Embedding 表的行数按特征域个数建"
+old = "self.emb = nn.Embedding(num_features, emb_dim)"
+new = "self.emb = nn.Embedding(n_fields, emb_dim)"
+
+[[mutant]]
+name = "漏掉 Wide 部分"
+old = "return self.wide(wide_x) + self.deep(deep_in)"
+new = "return self.deep(deep_in)"
+
+[[mutant]]
+name = "漏掉 Deep 部分"
+old = "return self.wide(wide_x) + self.deep(deep_in)"
+new = "return self.wide(wide_x) + 0 * self.deep(deep_in)"
+
+[[mutant]]
+name = "输出过了 sigmoid，返回的是概率而不是 logit"
+old = "return self.wide(wide_x) + self.deep(deep_in)"
+new = "return torch.sigmoid(self.wide(wide_x) + self.deep(deep_in))"
+
+[[mutant]]
+name = "各特征域的 embedding 取了平均而不是拼接"
+old = "deep_in = self.emb(feat_ids).flatten(1)"
+new = "deep_in = self.emb(feat_ids).mean(dim=1).repeat(1, feat_ids.size(1))"
+
+[[mutant]]
+name = "两部分各自过 sigmoid 后再相加"
+old = "return self.wide(wide_x) + self.deep(deep_in)"
+new = "return torch.sigmoid(self.wide(wide_x)) + torch.sigmoid(self.deep(deep_in))"

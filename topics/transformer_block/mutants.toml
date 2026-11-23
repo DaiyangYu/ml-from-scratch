@@ -1,0 +1,47 @@
+# 典型的错误写法。每一项是对参考实现的一处替换；`uv run drill verify` 会确认测试能拦住它们。
+
+[[mutant]]
+name = "漏掉除以 sqrt(d_k)"
+old = "scores = q @ k.transpose(-2, -1) / math.sqrt(q.size(-1))"
+new = "scores = q @ k.transpose(-2, -1)"
+
+[[mutant]]
+name = "mask 加在 softmax 之后（其余位置的权重之和不再为 1）"
+old = """    if mask is not None:
+        scores = scores.masked_fill(mask == 0, float("-inf"))
+    weights = F.softmax(scores, dim=-1)"""
+new = """    weights = F.softmax(scores, dim=-1)
+    if mask is not None:
+        weights = weights.masked_fill(mask == 0, 0.0)"""
+
+[[mutant]]
+name = "mask 的方向写反（屏蔽了可见的位置）"
+old = "scores.masked_fill(mask == 0, float(\"-inf\"))"
+new = "scores.masked_fill(mask != 0, float(\"-inf\"))"
+
+[[mutant]]
+name = "softmax 在查询的维度上归一化"
+old = "weights = F.softmax(scores, dim=-1)"
+new = "weights = F.softmax(scores, dim=-2)"
+
+[[mutant]]
+name = "分头时直接 view 成 [B, heads, L, d_k]，没有 transpose"
+old = "return x.view(B, L, self.num_heads, self.d_k).transpose(1, 2)"
+new = "return x.view(B, self.num_heads, L, self.d_k)"
+
+[[mutant]]
+name = "合并各头时没有先 transpose"
+old = "out = out.transpose(1, 2).reshape(B, L, -1)"
+new = "out = out.reshape(B, L, -1)"
+
+[[mutant]]
+name = "写成了 Post-LN"
+old = """        x = x + self.attn(self.ln1(x), mask)
+        x = x + self.ffn(self.ln2(x))"""
+new = """        x = self.ln1(x + self.attn(x, mask))
+        x = self.ln2(x + self.ffn(x))"""
+
+[[mutant]]
+name = "前馈子层漏掉残差连接"
+old = "x = x + self.ffn(self.ln2(x))"
+new = "x = self.ffn(self.ln2(x))"

@@ -1,0 +1,28 @@
+[project]
+name = "drill"
+version = "0.1.0"
+description = "手写经典模型与算法的练习仓库，附带基于 FSRS 的复习调度工具"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "fsrs>=6.3.3",
+]
+
+[project.scripts]
+drill = "drill:main"
+
+[build-system]
+requires = ["uv_build>=0.10.6,<0.11.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "numpy>=2.5.5",
+    "pytest>=9.2.0",
+    "torch>=2.15.0",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["topics"]
+addopts = "-q --tb=short -p no:cacheprovider"
+filterwarnings = ["ignore::DeprecationWarning", "ignore::UserWarning"]

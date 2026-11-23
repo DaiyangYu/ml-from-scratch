@@ -1,0 +1,20 @@
+{
+    // 手写时不应看到的文件：参考实现、错误写法清单、题目附带的现成模块。
+    // 它们不会出现在资源管理器、快速打开和搜索中；
+    // 写完后用 `uv run drill diff <题目> --ref` 在对比视图里查看参考实现。
+    "files.exclude": {
+        "**/topics/*/*_ref.py": true,
+        "**/topics/*/*_given.py": true,
+        "**/topics/*/mutants.toml": true,
+        "**/__pycache__": true,
+        "**/.drill": true
+    },
+    "search.exclude": {
+        "**/topics/*/*_ref.py": true,
+        "**/topics/*/*_given.py": true,
+        "**/topics/*/mutants.toml": true,
+        "**/.venv": true
+    },
+    "python.defaultInterpreterPath": "${workspaceFolder}/.venv/bin/python",
+    "python.analysis.extraPaths": ["${workspaceFolder}/src"]
+}

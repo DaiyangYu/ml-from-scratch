@@ -1,0 +1,36 @@
+# 典型的错误写法。每一项是对参考实现的一处替换；`uv run drill verify` 会确认测试能拦住它们。
+
+[[mutant]]
+name = "求和时没有乘掩码，padding 也被累加"
+old = "avg = (h * m).sum(dim=1) / m.sum(dim=1).clamp(min=1)"
+new = "avg = h.sum(dim=1) / m.sum(dim=1).clamp(min=1)"
+
+[[mutant]]
+name = "除以序列长度 L 而不是真实历史的个数"
+old = "avg = (h * m).sum(dim=1) / m.sum(dim=1).clamp(min=1)"
+new = "avg = (h * m).sum(dim=1) / h.size(1)"
+
+[[mutant]]
+name = "完全没有用掩码，直接取平均"
+old = "avg = (h * m).sum(dim=1) / m.sum(dim=1).clamp(min=1)"
+new = "avg = h.mean(dim=1)"
+
+[[mutant]]
+name = "分母没有设下限，历史全是 padding 时得到 nan"
+old = "m.sum(dim=1).clamp(min=1)"
+new = "m.sum(dim=1)"
+
+[[mutant]]
+name = "掩码取反"
+old = "m = hist_mask.unsqueeze(-1).float()"
+new = "m = 1 - hist_mask.unsqueeze(-1).float()"
+
+[[mutant]]
+name = "平均向量没有经过用户塔"
+old = "u = self.user_tower(avg) "
+new = "u = avg "
+
+[[mutant]]
+name = "只求和不取平均"
+old = "avg = (h * m).sum(dim=1) / m.sum(dim=1).clamp(min=1)"
+new = "avg = (h * m).sum(dim=1)"

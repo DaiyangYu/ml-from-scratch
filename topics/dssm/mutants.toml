@@ -1,0 +1,38 @@
+# 典型的错误写法。每一项是对参考实现的一处替换；`uv run drill verify` 会确认测试能拦住它们。
+
+[[mutant]]
+name = "用户向量没有做 L2 归一化"
+old = "return F.normalize(self.user_tower(user_feats), dim=-1)"
+new = "return self.user_tower(user_feats)"
+
+[[mutant]]
+name = "物品向量没有做 L2 归一化"
+old = "return F.normalize(self.item_tower(item_feats), dim=-1)"
+new = "return self.item_tower(item_feats)"
+
+[[mutant]]
+name = "在 batch 维度上做归一化"
+old = "return F.normalize(self.user_tower(user_feats), dim=-1)"
+new = "return F.normalize(self.user_tower(user_feats), dim=0)"
+
+[[mutant]]
+name = "塔里漏掉激活函数"
+old = "nn.Linear(in_dim, hidden), nn.ReLU(), nn.Linear(hidden, out_dim)"
+new = "nn.Linear(in_dim, hidden), nn.Linear(hidden, out_dim)"
+
+[[mutant]]
+name = "激活函数用了 Sigmoid"
+old = "nn.Linear(in_dim, hidden), nn.ReLU(), nn.Linear(hidden, out_dim)"
+new = "nn.Linear(in_dim, hidden), nn.Sigmoid(), nn.Linear(hidden, out_dim)"
+
+[[mutant]]
+name = "forward 里绕过归一化直接用塔的输出"
+old = """        u = self.encode_user(user_feats)
+        i = self.encode_item(item_feats)"""
+new = """        u = self.user_tower(user_feats)
+        i = self.item_tower(item_feats)"""
+
+[[mutant]]
+name = "点积没有在向量维度上求和"
+old = "return (u * i).sum(dim=-1)  # [B]"
+new = "return (u * i)"

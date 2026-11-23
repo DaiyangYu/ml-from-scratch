@@ -1,0 +1,58 @@
+# 典型的错误写法。每一项是对参考实现的一处替换；`uv run drill verify` 会确认测试能拦住它们。
+# 发现某种错误写法能通过测试时，先把它加到这里，再补测试直到它被拦住。
+
+[[mutant]]
+name = "加法的导数用赋值而不是累加"
+old = """            self.grad += out.grad
+            other.grad += out.grad"""
+new = """            self.grad = out.grad
+            other.grad = out.grad"""
+
+[[mutant]]
+name = "乘法的导数用赋值而不是累加"
+old = """            self.grad += other.data * out.grad
+            other.grad += self.data * out.grad"""
+new = """            self.grad = other.data * out.grad
+            other.grad = self.data * out.grad"""
+
+[[mutant]]
+name = "不做拓扑排序，按深度优先直接传播"
+old = """        build(self)
+        self.grad = 1.0
+        for v in reversed(order):
+            v._backward()"""
+new = """        self.grad = 1.0
+
+        def go(v):
+            v._backward()
+            for child in v._prev:
+                go(child)
+
+        go(self)"""
+
+[[mutant]]
+name = "tanh 的导数写成 1 - t"
+old = "(1 - t * t) * out.grad"
+new = "(1 - t) * out.grad"
+
+[[mutant]]
+name = "relu 的导数恒为 1"
+old = "(out.data > 0) * out.grad"
+new = "out.grad"
+
+[[mutant]]
+name = "幂的导数漏乘指数"
+old = "k * self.data ** (k - 1) * out.grad"
+new = "self.data ** (k - 1) * out.grad"
+
+[[mutant]]
+name = "乘法的导数没有交换两个操作数"
+old = """            self.grad += other.data * out.grad
+            other.grad += self.data * out.grad"""
+new = """            self.grad += self.data * out.grad
+            other.grad += other.data * out.grad"""
+
+[[mutant]]
+name = "反向减法的符号写反"
+old = "return other + (-self)"
+new = "return self + (-other)"

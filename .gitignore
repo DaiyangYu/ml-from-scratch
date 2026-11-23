@@ -1,0 +1,17 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+
+# drill 的进行中状态（开始时间等），只在本机有意义
+.drill/
+
+# 测试与编辑器缓存
+.pytest_cache/
+.idea/

@@ -1,0 +1,55 @@
+name: 复习提醒
+
+# 每天北京时间 8:00 检查有没有到期的题目。
+# 有则新建一个 issue（GitHub 会按账号的通知设置发邮件），并关闭之前的提醒；没有则只关闭旧提醒。
+
+on:
+  schedule:
+    - cron: "0 0 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  remind:
+    runs-on: ubuntu-latest
+    env:
+      TZ: Asia/Shanghai
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+
+      - name: 找出到期的题目
+        id: due
+        run: |
+          # --no-dev：只装调度工具本身的依赖，不装 torch
+          uv run --no-dev drill status --due-only > due.md
+          cat due.md
+          echo "count=$(grep -c . due.md || true)" >> "$GITHUB_OUTPUT"
+
+      - name: 关闭之前的提醒
+        run: |
+          gh label create 复习提醒 --color FBCA04 --description "到期复习的每日提醒" 2>/dev/null || true
+          for number in $(gh issue list --label 复习提醒 --state open --json number --jq '.[].number'); do
+            gh issue close "$number"
+          done
+
+      - name: 新建今天的提醒
+        if: steps.due.outputs.count != '0'
+        run: |
+          {
+            echo "@${{ github.repository_owner }} 今天有 ${{ steps.due.outputs.count }} 道题到期："
+            echo
+            cat due.md
+            echo
+            echo '开始复习：`uv run drill start`'
+          } > body.md
+          gh issue create \
+            --title "复习提醒 $(date +%F)：${{ steps.due.outputs.count }} 道题到期" \
+            --label 复习提醒 \
+            --assignee "${{ github.repository_owner }}" \
+            --body-file body.md

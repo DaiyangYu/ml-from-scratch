@@ -1,0 +1,39 @@
+# 典型的错误写法。每一项是对参考实现的一处替换；`uv run drill verify` 会确认测试能拦住它们。
+
+[[mutant]]
+name = "给 DNN 分支另建了一张 Embedding 表"
+old = """        self.emb = nn.Embedding(num_features, dim)
+"""
+new = """        self.emb = nn.Embedding(num_features, dim)
+        self.dnn_emb = nn.Embedding(num_features, dim)
+"""
+
+[[mutant]]
+name = "漏掉 DNN 分支的输出"
+old = "return self.w0 + linear_part + cross + dnn_out"
+new = "return self.w0 + linear_part + cross"
+
+[[mutant]]
+name = "漏掉 FM 的二阶交叉项"
+old = "return self.w0 + linear_part + cross + dnn_out"
+new = "return self.w0 + linear_part + dnn_out"
+
+[[mutant]]
+name = "漏掉一阶项"
+old = "return self.w0 + linear_part + cross + dnn_out"
+new = "return self.w0 + cross + dnn_out"
+
+[[mutant]]
+name = "漏掉全局偏置 w0"
+old = "return self.w0 + linear_part + cross + dnn_out"
+new = "return linear_part + cross + dnn_out"
+
+[[mutant]]
+name = "交叉项两项相减的顺序写反"
+old = "(square_of_sum - sum_of_square)"
+new = "(sum_of_square - square_of_sum)"
+
+[[mutant]]
+name = "交叉项漏掉系数 0.5"
+old = "cross = 0.5 * (square_of_sum"
+new = "cross = (square_of_sum"

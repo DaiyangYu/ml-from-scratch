@@ -1,0 +1,31 @@
+# 典型的错误写法。每一项是对参考实现的一处替换；`uv run drill verify` 会确认测试能拦住它们。
+
+[[mutant]]
+name = "物品 id 查了用户表"
+old = "i = self.item_emb(item_ids)"
+new = "i = self.user_emb(item_ids)"
+
+[[mutant]]
+name = "对应位置相加而不是相乘"
+old = "(u * i).sum(dim=-1)"
+new = "(u + i).sum(dim=-1)"
+
+[[mutant]]
+name = "在 batch 维度上求和"
+old = "(u * i).sum(dim=-1)"
+new = "(u * i).sum(dim=0)"
+
+[[mutant]]
+name = "没有在向量维度上求和"
+old = "(u * i).sum(dim=-1)"
+new = "(u * i)"
+
+[[mutant]]
+name = "输出形状是 [B, 1] 而不是 [B]"
+old = "(u * i).sum(dim=-1)"
+new = "(u * i).sum(dim=-1, keepdim=True)"
+
+[[mutant]]
+name = "写成了矩阵乘法，得到 [B, B] 的两两打分"
+old = "(u * i).sum(dim=-1)"
+new = "u @ i.T"

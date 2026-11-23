@@ -1,0 +1,36 @@
+# 典型的错误写法。每一项是对参考实现的一处替换；`uv run drill verify` 会确认测试能拦住它们。
+
+[[mutant]]
+name = "方向写反：负样本分数减正样本分数"
+old = "F.logsigmoid(pos_score - neg_score)"
+new = "F.logsigmoid(neg_score - pos_score)"
+
+[[mutant]]
+name = "漏掉负号"
+old = "return -F.logsigmoid("
+new = "return F.logsigmoid("
+
+[[mutant]]
+name = "求和而不是取平均"
+old = ".mean()"
+new = ".sum()"
+
+[[mutant]]
+name = "用 sigmoid 代替 logsigmoid"
+old = "-F.logsigmoid(pos_score - neg_score)"
+new = "-torch.sigmoid(pos_score - neg_score)"
+
+[[mutant]]
+name = "先 sigmoid 再取对数，分数差很大时溢出"
+old = "-F.logsigmoid(pos_score - neg_score)"
+new = "-torch.log(torch.sigmoid(pos_score - neg_score))"
+
+[[mutant]]
+name = "负样本分数算成了正样本的分数"
+old = "neg_score = model(users, neg_items)"
+new = "neg_score = model(users, pos_items)"
+
+[[mutant]]
+name = "只惩罚负样本分数，没有与正样本比较"
+old = "F.logsigmoid(pos_score - neg_score)"
+new = "F.logsigmoid(-neg_score)"

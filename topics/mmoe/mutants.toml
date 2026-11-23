@@ -1,0 +1,36 @@
+# 典型的错误写法。每一项是对参考实现的一处替换；`uv run drill verify` 会确认测试能拦住它们。
+
+[[mutant]]
+name = "gate 的输出没有做 softmax"
+old = "weight = torch.softmax(gate(x), dim=-1)"
+new = "weight = gate(x)"
+
+[[mutant]]
+name = "softmax 做在 batch 维而不是专家维"
+old = "weight = torch.softmax(gate(x), dim=-1)"
+new = "weight = torch.softmax(gate(x), dim=0)"
+
+[[mutant]]
+name = "gate 用 sigmoid 代替 softmax"
+old = "weight = torch.softmax(gate(x), dim=-1)"
+new = "weight = torch.sigmoid(gate(x))"
+
+[[mutant]]
+name = "所有任务都用了第一个 gate"
+old = "weight = torch.softmax(gate(x), dim=-1)"
+new = "weight = torch.softmax(self.gates[0](x), dim=-1)"
+
+[[mutant]]
+name = "加权后取平均而不是求和"
+old = "(weight.unsqueeze(-1) * expert_out).sum(dim=1)"
+new = "(weight.unsqueeze(-1) * expert_out).mean(dim=1)"
+
+[[mutant]]
+name = "没有用 gate 的权重，直接把专家输出取平均"
+old = "(weight.unsqueeze(-1) * expert_out).sum(dim=1)"
+new = "expert_out.mean(dim=1)"
+
+[[mutant]]
+name = "权重补维的位置不对（补在专家维之前，专家个数与输出维度相等时不会报错）"
+old = "(weight.unsqueeze(-1) * expert_out).sum(dim=1)"
+new = "(weight.unsqueeze(1) * expert_out).sum(dim=1)"
