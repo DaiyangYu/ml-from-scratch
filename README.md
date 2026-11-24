@@ -13,6 +13,7 @@
 | [logistic_regression](topics/logistic_regression) | 用 numpy 实现逻辑回归与梯度下降 | 15 分钟 |
 | [auc](topics/auc) | AUC 与 GAUC | 15 分钟 |
 | [topk_metrics](topics/topk_metrics) | Recall@K 与 NDCG@K | 10 分钟 |
+| [kmeans](topics/kmeans) | 用 numpy 实现 K-means | 15 分钟 |
 | [mf](topics/mf) | Embedding 与矩阵分解 | 5 分钟 |
 | [skipgram](topics/skipgram) | Word2Vec Skip-gram 与负采样损失 | 10 分钟 |
 | [fm](topics/fm) | 因子分解机 | 15 分钟 |
@@ -27,6 +28,7 @@
 | [wide_deep](topics/wide_deep) | Wide & Deep | 10 分钟 |
 | [deepfm](topics/deepfm) | DeepFM | 15 分钟 |
 | [sasrec](topics/sasrec) | SASRec（Transformer Block 作为现成部件） | 20 分钟 |
+| [rq_vae](topics/rq_vae) | RQ-VAE 的残差量化（TIGER 的语义 ID） | 15 分钟 |
 | [youtube_dnn](topics/youtube_dnn) | YouTubeDNN 召回 | 10 分钟 |
 | [augru](topics/augru) | DIEN 的 AUGRU 单元 | 15 分钟 |
 | [esmm](topics/esmm) | ESMM | 10 分钟 |

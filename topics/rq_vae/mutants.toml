@@ -1,0 +1,56 @@
+# 典型的错误写法。每一项是对参考实现的一处替换；`uv run drill verify` 会确认测试能拦住它们。
+
+[[mutant]]
+name = "没有更新残差：每一层量化的都是原始输入"
+old = "residual = residual - e.detach()"
+new = "residual = residual + 0.0"
+
+[[mutant]]
+name = "取了距离最大的码字"
+old = "index = distances.argmin(dim=-1)"
+new = "index = distances.argmax(dim=-1)"
+
+[[mutant]]
+name = "用内积最大代替欧氏距离最小"
+old = "distances = (residual.unsqueeze(1) - codebook.weight.unsqueeze(0)).pow(2).sum(dim=-1)"
+new = "distances = -(residual @ codebook.weight.t())"
+
+[[mutant]]
+name = "两项损失的 detach 位置写反：beta 乘到了更新码本的那一项上"
+old = "F.mse_loss(e, residual.detach()) + self.beta * F.mse_loss(residual, e.detach())"
+new = "F.mse_loss(residual, e.detach()) + self.beta * F.mse_loss(e, residual.detach())"
+
+[[mutant]]
+name = "commitment loss 没有乘 beta"
+old = "self.beta * F.mse_loss(residual, e.detach())"
+new = "F.mse_loss(residual, e.detach())"
+
+[[mutant]]
+name = "漏掉 commitment loss"
+old = " + self.beta * F.mse_loss(residual, e.detach())"
+new = ""
+
+[[mutant]]
+name = "计算下一层残差时没有 detach 码字"
+old = "residual = residual - e.detach()"
+new = "residual = residual - e"
+
+[[mutant]]
+name = "没有做直通估计：直接返回码字之和"
+old = "z_q = z + (quantized - z).detach()"
+new = "z_q = quantized"
+
+[[mutant]]
+name = "直通估计写反：数值变成了 z"
+old = "z_q = z + (quantized - z).detach()"
+new = "z_q = quantized + (z - quantized).detach()"
+
+[[mutant]]
+name = "各层损失取了平均而不是相加"
+old = "return z_q, loss, torch.stack(codes, dim=-1)"
+new = "return z_q, loss / len(self.codebooks), torch.stack(codes, dim=-1)"
+
+[[mutant]]
+name = "所有层共用第一个码本"
+old = "e = codebook(index) "
+new = "e = self.codebooks[0](index); codebook = self.codebooks[0] "

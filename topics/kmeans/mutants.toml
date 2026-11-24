@@ -1,0 +1,52 @@
+# 典型的错误写法。每一项是对参考实现的一处替换；`uv run drill verify` 会确认测试能拦住它们。
+
+[[mutant]]
+name = "空簇没有处理，均值得到 nan"
+old = "if len(members) > 0:"
+new = "if True:"
+
+[[mutant]]
+name = "返回的是按更新前的中心分配的结果"
+old = """    return centers, assign(X, centers)"""
+new = """    return centers, (labels if max_iters > 0 else assign(X, centers))"""
+
+[[mutant]]
+name = "取均值时没有指定轴，得到一个标量"
+old = "members.mean(axis=0)"
+new = "members.mean()"
+
+[[mutant]]
+name = "中心取了簇内样本之和而不是均值"
+old = "members.mean(axis=0)"
+new = "members.sum(axis=0)"
+
+[[mutant]]
+name = "分给了距离最远的中心"
+old = "return distances.argmin(axis=1)"
+new = "return distances.argmax(axis=1)"
+
+[[mutant]]
+name = "用曼哈顿距离代替欧氏距离"
+old = "((X[:, None, :] - centers[None, :, :]) ** 2).sum(axis=2)"
+new = "np.abs(X[:, None, :] - centers[None, :, :]).sum(axis=2)"
+
+[[mutant]]
+name = "多做了一轮"
+old = "for _ in range(max_iters):"
+new = "for _ in range(max_iters + 1):"
+
+[[mutant]]
+name = "原地更新了调用者传入的初始中心"
+old = """        new_centers = centers.copy()  # 先复制：空簇的中心保持不变"""
+new = """        new_centers = centers.copy()
+        init_centers[...] = centers"""
+
+[[mutant]]
+name = "空簇的中心被置为 0"
+old = "new_centers = centers.copy()  # 先复制：空簇的中心保持不变"
+new = "new_centers = np.zeros_like(centers)"
+
+[[mutant]]
+name = "只做了一轮就返回"
+old = "        centers = new_centers\n"
+new = "        centers = new_centers\n        break\n"
