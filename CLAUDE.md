@@ -13,7 +13,7 @@ topics/<题目>/
     <题目>_ref.py     参考实现（VSCode 中默认隐藏）
     mutants.toml      典型错误写法清单，用来检验测试是否有效（VSCode 中默认隐藏）
     NOTES.md          每次手写后的错误记录
-reviews.jsonl         只追加的复习记录，调度状态全部由它推算
+reviews.jsonl         只追加的记录（复习、暂停、恢复），调度状态全部由它推算
 src/drill/            调度工具；src/drill/testing.py 是测试共用的辅助函数
 .github/workflows/remind.yml   每天检查到期题目并建 issue 提醒
 ```
@@ -27,7 +27,11 @@ uv run drill check [题目]    只跑测试
 uv run drill done  [题目]    跑测试、评分、写入 reviews.jsonl、提交并推送，然后在 VSCode 中打开对比
 uv run drill diff  [题目]    与上一次手写的版本对比；加 --ref 与参考实现对比
 uv run drill verify [题目]   检验测试本身：参考实现应通过，mutants.toml 中的错误写法应全部被拦住
+uv run drill pause  题目…    暂停复习计划：不再出现在到期列表和每日提醒中；--all 暂停所有已经写过的题目
+uv run drill resume 题目…    恢复复习计划；--all 恢复全部
 ```
+
+暂停不改变调度状态：到期时间不顺延，恢复后已过期的题目立即到期。`pause` 和 `resume` 会提交并推送 `reviews.jsonl`，每日提醒读到的是 GitHub 上的版本。
 
 评分由 `done` 自动判定：看过参考或放弃为 again，独立写出但第一次测试未通过为 hard，独立写出且一次通过为 good。
 

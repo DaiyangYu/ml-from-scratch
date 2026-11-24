@@ -6,9 +6,11 @@
     uv run drill check [题目]   只跑测试，不记录不提交
     uv run drill diff  [题目]   与上一次手写的版本对比；加 --ref 与参考实现对比
     uv run drill verify [题目]  检验测试本身：参考实现应通过，各种错误写法应被拦住
+    uv run drill pause  题目…   暂停复习计划：不再出现在到期列表和每日提醒中；--all 暂停全部
+    uv run drill resume 题目…   恢复复习计划；--all 恢复全部
 
-调度状态不单独存储：reviews.jsonl 是只追加的复习记录，
-每次都由它重新推算出各题目的到期时间。
+调度状态不单独存储：reviews.jsonl 是只追加的记录（复习、暂停、恢复），
+每次都由它重新推算出各题目的到期时间和是否暂停。
 """
 
 from __future__ import annotations
@@ -92,21 +94,55 @@ def reference_path(topic: str) -> Path:
     return TOPICS / topic / f"{topic}_ref.py"
 
 
-def load_reviews() -> list[dict]:
+def load_log() -> list[dict]:
+    """读出全部记录。带 rating 的是一次复习，带 event 的是暂停（pause）或恢复（resume）。"""
     if not LOG.exists():
         return []
     return [json.loads(line) for line in LOG.read_text(encoding="utf-8").splitlines() if line.strip()]
 
 
-def card_of(topic: str, reviews: list[dict]) -> tuple[Card | None, list[dict]]:
-    """由复习记录推算某题目当前的调度状态。"""
-    history = [r for r in reviews if r["topic"] == topic]
+def append_log(*records: dict) -> None:
+    with LOG.open("a", encoding="utf-8") as f:
+        for record in records:
+            f.write(json.dumps(record, ensure_ascii=False) + "\n")
+
+
+def card_of(topic: str, log: list[dict]) -> tuple[Card | None, list[dict]]:
+    """由复习记录推算某题目当前的调度状态。
+
+    暂停与恢复不参与推算：暂停只是不提醒，遗忘并不会停止，所以到期时间不顺延。
+    恢复后隔了多久才复习，由下一次复习记录的时间如实交给 FSRS 处理。
+    """
+    history = [r for r in log if r["topic"] == topic and "rating" in r]
     if not history:
         return None, history
     card = Card()
     for r in history:
         card, _ = SCHEDULER.review_card(card, RATINGS[r["rating"]], datetime.fromisoformat(r["time"]))
     return card, history
+
+
+def paused_since(topic: str, log: list[dict]) -> datetime | None:
+    """题目处于暂停状态时返回暂停的时间，否则返回 None。"""
+    since = None
+    for r in log:
+        if r["topic"] == topic and "event" in r:
+            since = datetime.fromisoformat(r["time"]) if r["event"] == "pause" else None
+    return since
+
+
+def commit_and_push(paths: list[Path], message: str) -> None:
+    """提交指定路径并推送。失败时只提示不中断，因为记录已经写入文件。"""
+    names = [str(p) for p in paths]
+    git("add", "--", *names)
+    commit = git("commit", "-m", message, "--", *names)
+    if commit.returncode != 0:
+        print(f"\n已记录，但 git 提交失败，请手动提交：\n{commit.stderr.strip() or commit.stdout.strip()}")
+    elif git("rev-parse", "--abbrev-ref", "@{u}").returncode == 0:
+        push = git("push")
+        print("已提交并推送。" if push.returncode == 0 else f"已提交，但推送失败：\n{push.stderr.strip()}")
+    else:
+        print("已提交（尚未设置远程仓库，未推送）。")
 
 
 def days_until_due(card: Card) -> int:
@@ -143,27 +179,36 @@ def resolve_topic(topic: str | None) -> str:
 
 # ---------- 查看到期 ----------
 
-def due_rows() -> tuple[list, list, list]:
-    """返回（到期、未开始、未到期）三组题目。"""
-    reviews = load_reviews()
-    due, fresh, later = [], [], []
+def due_rows() -> tuple[list, list, list, list]:
+    """返回（到期、未开始、未到期、已暂停）四组题目。"""
+    log = load_log()
+    due, fresh, later, paused = [], [], [], []
     for topic in all_topics():
-        card, history = card_of(topic, reviews)
+        card, history = card_of(topic, log)
         if card is None:
             fresh.append(topic)
             continue
+        since = paused_since(topic, log)
+        if since is not None:
+            paused.append((topic, since, card))
+            continue
         days = days_until_due(card)
         (due if days <= 0 else later).append((days, topic, card, history))
-    return sorted(due), fresh, sorted(later)
+    return sorted(due), fresh, sorted(later), paused
 
 
 def overdue_text(days: int) -> str:
     return "今天到期" if days == 0 else f"已逾期 {-days} 天"
 
 
+def schedule_text(card: Card) -> str:
+    days = days_until_due(card)
+    return overdue_text(days) if days <= 0 else f"{card.due.astimezone():%m-%d} 到期（{days} 天后）"
+
+
 def cmd_status(args: argparse.Namespace) -> None:
     topics = all_topics()
-    due, fresh, later = due_rows()
+    due, fresh, later, paused = due_rows()
     if getattr(args, "due_only", False):  # 供定时提醒使用：只输出到期的题目，没有则不输出
         for days, topic, _, _ in due:
             print(f"- {topic}（{overdue_text(days)}）")
@@ -181,6 +226,10 @@ def cmd_status(args: argparse.Namespace) -> None:
         print(f"未到期（{len(later)}）")
         for days, topic, card, _ in later:
             print(f"  {topic:<{width}}{card.due.astimezone():%m-%d}（{days} 天后）")
+    if paused:
+        print(f"已暂停（{len(paused)}）")
+        for topic, since, card in paused:
+            print(f"  {topic:<{width}}{since.astimezone():%m-%d} 起暂停，原计划：{schedule_text(card)}")
     if fresh:
         print(f"未开始（{len(fresh)}）")
         print("  " + "  ".join(fresh))
@@ -192,8 +241,8 @@ def cmd_status(args: argparse.Namespace) -> None:
 # ---------- 开始 ----------
 
 def pick_next_topic() -> str:
-    """未指定题目时选逾期最久的。还没写过的题目不自动挑选，由用户自己决定何时开始。"""
-    due, fresh, _ = due_rows()
+    """未指定题目时选逾期最久的。还没写过的和已暂停的题目不自动挑选，由用户自己决定何时开始。"""
+    due, fresh, _, _ = due_rows()
     if due:
         return due[0][1]
     hint = f"还没写过的题目：{'、'.join(fresh)}。" if fresh else ""
@@ -289,24 +338,17 @@ def cmd_done(args: argparse.Namespace) -> None:
         "first_run_passed": bool(session["first_run_passed"]),
         "minutes": minutes,
     }
-    with LOG.open("a", encoding="utf-8") as f:
-        f.write(json.dumps(record, ensure_ascii=False) + "\n")
+    append_log(record)
     SESSION.unlink()
 
-    card, history = card_of(topic, load_reviews())
+    log = load_log()
+    card, history = card_of(topic, log)
     print(f"\n评分 {rating}，用时 {minutes} 分钟，这是第 {len(history)} 次。")
     print(f"下次复习：{card.due.astimezone():%Y-%m-%d}（{days_until_due(card)} 天后）")
+    if paused_since(topic, log) is not None:
+        print(f"这道题仍处于暂停状态，到期时不会提醒。恢复：uv run drill resume {topic}")
 
-    paths = [str(TOPICS / topic), str(LOG)]
-    git("add", "--", *paths)
-    commit = git("commit", "-m", f"review({topic}): {rating}，第 {len(history)} 次", "--", *paths)
-    if commit.returncode != 0:
-        print(f"\n复习已记录，但 git 提交失败，请手动提交：\n{commit.stderr.strip() or commit.stdout.strip()}")
-    elif git("rev-parse", "--abbrev-ref", "@{u}").returncode == 0:
-        push = git("push")
-        print("已提交并推送。" if push.returncode == 0 else f"已提交，但推送失败：\n{push.stderr.strip()}")
-    else:
-        print("已提交（尚未设置远程仓库，未推送）。")
+    commit_and_push([TOPICS / topic, LOG], f"review({topic}): {rating}，第 {len(history)} 次")
 
     # 写完之后才对照：先看与参考实现的差别，再看与自己上一次的差别
     if not args.no_open:
@@ -315,6 +357,62 @@ def cmd_done(args: argparse.Namespace) -> None:
             diff_with_previous(topic)
     print(f"再次查看对比：uv run drill diff {topic} --ref（与参考实现）"
           + (f"，uv run drill diff {topic}（与上一次）" if len(history) > 1 else ""))
+
+
+# ---------- 暂停与恢复 ----------
+
+def set_paused(args: argparse.Namespace, pause: bool) -> None:
+    """追加暂停或恢复事件。提交并推送之后，每日提醒才会随之变化。"""
+    verb = "暂停" if pause else "恢复"
+    log = load_log()
+    written = [t for t in all_topics() if card_of(t, log)[0] is not None]
+    paused = [t for t in written if paused_since(t, log) is not None]
+    candidates = [t for t in written if t not in paused] if pause else paused
+
+    if args.all and args.topics:
+        die("--all 不能与题目名同时使用。")
+    if args.all:
+        topics = candidates
+        if not topics:
+            die("没有正在复习的题目可以暂停。" if pause else "没有处于暂停状态的题目。")
+    elif args.topics:
+        topics = list(dict.fromkeys(check_topic(t) for t in args.topics))
+    else:
+        hint = f"可以{verb}的题目：{'、'.join(candidates)}。" if candidates else f"目前没有可以{verb}的题目。"
+        die(f"请指定题目名，或加 --all。{hint}")
+
+    changed = []
+    for topic in topics:
+        if topic not in written:
+            print(f"{topic}：还没写过，没有复习计划，不需要{verb}。")
+        elif pause and topic in paused:
+            print(f"{topic}：{paused_since(topic, log).astimezone():%Y-%m-%d} 起已经暂停。")
+        elif not pause and topic not in paused:
+            print(f"{topic}：没有暂停。")
+        else:
+            changed.append(topic)
+    if not changed:
+        return
+
+    time = now().isoformat(timespec="seconds")
+    append_log(*({"topic": t, "time": time, "event": "pause" if pause else "resume"} for t in changed))
+    for topic in changed:
+        # 到期时间在暂停期间不顺延，恢复后按原计划继续，已过期的立即进入到期列表
+        print(f"已{verb} {topic}，原计划：{schedule_text(card_of(topic, log)[0])}")
+    if pause:
+        print("暂停期间不出现在到期列表和每日提醒中，仍可以用 drill start <题目> 主动手写。")
+        print("恢复：uv run drill resume <题目>")
+
+    summary = "、".join(changed) if len(changed) <= 3 else f"{changed[0]} 等 {len(changed)} 道题"
+    commit_and_push([LOG], f"{'pause' if pause else 'resume'}: {summary}")
+
+
+def cmd_pause(args: argparse.Namespace) -> None:
+    set_paused(args, pause=True)
+
+
+def cmd_resume(args: argparse.Namespace) -> None:
+    set_paused(args, pause=False)
 
 
 # ---------- 对比 ----------
@@ -453,6 +551,16 @@ def main() -> None:
     p = sub.add_parser("verify", help="检验测试本身：参考实现应通过，各种错误写法应被拦住")
     p.add_argument("topics", nargs="*", help="省略则检验全部题目")
     p.set_defaults(func=cmd_verify)
+
+    p = sub.add_parser("pause", help="暂停复习计划：不再出现在到期列表和每日提醒中")
+    p.add_argument("topics", nargs="*")
+    p.add_argument("--all", action="store_true", help="暂停所有已经写过的题目")
+    p.set_defaults(func=cmd_pause)
+
+    p = sub.add_parser("resume", help="恢复复习计划：按原计划的到期时间继续，不顺延")
+    p.add_argument("topics", nargs="*")
+    p.add_argument("--all", action="store_true", help="恢复所有已暂停的题目")
+    p.set_defaults(func=cmd_resume)
 
     # 输出被重定向时也按行刷新，保证自身的输出与 pytest、git 等子进程的输出顺序一致
     sys.stdout.reconfigure(line_buffering=True)

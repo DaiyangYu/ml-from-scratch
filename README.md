@@ -49,7 +49,11 @@ uv run drill done        # 写完：跑测试、评分、记录、提交，然�
 uv run drill check       # 只跑测试，不记录
 uv run drill diff fm     # 与上一次手写的版本对比；加 --ref 与参考实现对比
 uv run drill verify      # 检验测试本身是否有效
+uv run drill pause fm    # 暂停某道题的复习计划；--all 暂停所有已经写过的题目
+uv run drill resume fm   # 恢复；--all 恢复全部
 ```
+
+暂停只是不提醒：题目不再出现在到期列表和每日提醒中，但遗忘不会因此停止，所以到期时间不顺延。恢复后按原计划继续，已经过期的立即进入到期列表；隔了多久才复习，由 FSRS 在下一次评分时按实际间隔处理。暂停期间仍然可以用 `drill start <题目>` 主动手写。
 
 ## 怎样保证测试可靠
 
@@ -69,7 +73,7 @@ topics/<题目>/
     <题目>_ref.py     参考实现（VSCode 中默认隐藏，写完后在对比视图中查看）
     mutants.toml      典型错误写法清单（VSCode 中默认隐藏）
     NOTES.md          每次手写后的错误记录
-reviews.jsonl         复习记录
+reviews.jsonl         复习记录，以及暂停、恢复的记录
 src/drill/            调度工具
 ```
 
