@@ -3,7 +3,7 @@
 import numpy as np
 
 def sigmoid(z):
-    return np.exp(-np.logaddexp(0.0,-z))
+    return np.exp(-np.logaddexp(0,-z))
 
 
 class LogisticRegression:
@@ -11,7 +11,7 @@ class LogisticRegression:
         self.lr = lr
         self.n_iters = n_iters
         self.w = None
-        self.b = 0
+        self.b = 0.0
 
     def fit(self, X, y):  # X: [n, d], y: [n] -> self
         X = np.asarray(X)
@@ -20,16 +20,17 @@ class LogisticRegression:
         self.w = np.zeros(d)
         self.b = 0.0
         for _ in range(self.n_iters):
-            p = sigmoid(X@self.w+self.b)
-            error = p-y
-            grad_w = 1/n * X.T @ error
+            z = X @ self.w + self.b
+            p = sigmoid(z)
+            error = p-y  # [n,]
+            grad_w = (X.T @ error)/n
             grad_b = error.mean()
             self.w -= self.lr*grad_w
             self.b -= self.lr*grad_b
         return self
 
     def predict_proba(self, X):  # [n, d] -> [n]
-        return sigmoid(np.asarray(X,dtype=float)@self.w + self.b)
+        return sigmoid(np.asarray(X) @ self.w + self.b)
 
     def predict(self, X):  # [n, d] -> [n]，取值 0 或 1
-        return (self.predict_proba(X) >= 0.5).astype(int)
+        return (self.predict_proba(X)>=0.5).astype(int)
