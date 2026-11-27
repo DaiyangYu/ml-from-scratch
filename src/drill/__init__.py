@@ -11,6 +11,9 @@
 
 调度状态不单独存储：reviews.jsonl 是只追加的记录（复习、暂停、恢复），
 每次都由它重新推算出各题目的到期时间和是否暂停。
+
+日期一律按“学习日”计算：北京时间，以凌晨 4 点为一天的开始。间隔推算、到期显示和
+每日提醒用的是同一套日期，所以显示“今天到期”的题目，当天任何时候写都按隔了整天处理。
 """
 
 from __future__ import annotations
@@ -24,7 +27,7 @@ import sys
 import tempfile
 import tomllib
 from concurrent.futures import ThreadPoolExecutor
-from datetime import datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
 from fsrs import Card, Rating, Scheduler
@@ -54,6 +57,11 @@ SCHEDULER = Scheduler(
 
 RATINGS = {"again": Rating.Again, "hard": Rating.Hard, "good": Rating.Good, "easy": Rating.Easy}
 
+# 学习日的时区和起点。时区写死为北京时间（没有夏令时，用固定偏移即可），
+# 这样由记录推算的结果不随运行所在机器的时区变化；以凌晨 4 点为界，过了零点才写完的仍算前一天。
+STUDY_TZ = timezone(timedelta(hours=8))
+DAY_STARTS_AT_HOUR = 4
+
 
 # ---------- 基础工具 ----------
 
@@ -62,6 +70,21 @@ def now() -> datetime:
     if override:
         return datetime.fromisoformat(override).astimezone(timezone.utc)
     return datetime.now(timezone.utc)
+
+
+def study_day(moment: datetime) -> date:
+    """某个时刻属于哪个学习日。"""
+    return (moment.astimezone(STUDY_TZ) - timedelta(hours=DAY_STARTS_AT_HOUR)).date()
+
+
+def replay_time(day: date) -> datetime:
+    """交给 FSRS 的复习时间：学习日当天的固定时刻。
+
+    FSRS 把两次复习的时间差向下取整为天数，不满 24 小时算作同一天内的重复练习，稳定性几乎不增长。
+    如果直接传真实时间戳，前一天晚上写、第二天白天复习就会落入这种情况。
+    折算之后，它算出的天数恰好等于两个学习日之差。
+    """
+    return datetime(day.year, day.month, day.day, tzinfo=timezone.utc)
 
 
 def die(message: str) -> None:
@@ -112,14 +135,29 @@ def card_of(topic: str, log: list[dict]) -> tuple[Card | None, list[dict]]:
 
     暂停与恢复不参与推算：暂停只是不提醒，遗忘并不会停止，所以到期时间不顺延。
     恢复后隔了多久才复习，由下一次复习记录的时间如实交给 FSRS 处理。
+
+    首次学习也不参与推算，只把到期日定在下一个学习日（见 is_first_learning）。
     """
     history = [r for r in log if r["topic"] == topic and "rating" in r]
     if not history:
         return None, history
-    card = Card()
-    for r in history:
-        card, _ = SCHEDULER.review_card(card, RATINGS[r["rating"]], datetime.fromisoformat(r["time"]))
+    days = [study_day(datetime.fromisoformat(r["time"])) for r in history]
+    skip = 1 if is_first_learning(history[:1]) else 0
+    card = Card(due=replay_time(days[0] + timedelta(days=1))) if skip else Card()
+    for r, day in zip(history[skip:], days[skip:]):
+        card, _ = SCHEDULER.review_card(card, RATINGS[r["rating"]], replay_time(day))
     return card, history
+
+
+def is_first_learning(history: list[dict]) -> bool:
+    """这道题是否只有一条评分为 again 的记录，即刚完成首次学习。
+
+    第一次写一道题时看参考是在学习，不是在回忆。FSRS 用第一次评分给题目定难度，而且此后
+    连续 good 也几乎不会让它下降；如果把首次学习当作一次 again，所有题目都会从同一个偏高的
+    难度起步，难度不再反映题目本身。所以第一条 again 不交给 FSRS，
+    从下一次由空白独立重写开始评分。
+    """
+    return len(history) == 1 and history[0]["rating"] == "again"
 
 
 def paused_since(topic: str, log: list[dict]) -> datetime | None:
@@ -145,9 +183,14 @@ def commit_and_push(paths: list[Path], message: str) -> None:
         print("已提交（尚未设置远程仓库，未推送）。")
 
 
+def due_day(card: Card) -> date:
+    """到期的学习日。card.due 由 replay_time 加整数天得到，日期部分就是学习日。"""
+    return card.due.date()
+
+
 def days_until_due(card: Card) -> int:
-    """按本地日期计算距离到期的天数，负数表示已逾期。"""
-    return (card.due.astimezone().date() - now().astimezone().date()).days
+    """距离到期还有几个学习日，负数表示已逾期。"""
+    return (due_day(card) - study_day(now())).days
 
 
 def load_session() -> dict | None:
@@ -203,7 +246,7 @@ def overdue_text(days: int) -> str:
 
 def schedule_text(card: Card) -> str:
     days = days_until_due(card)
-    return overdue_text(days) if days <= 0 else f"{card.due.astimezone():%m-%d} 到期（{days} 天后）"
+    return overdue_text(days) if days <= 0 else f"{due_day(card):%m-%d} 到期（{days} 天后）"
 
 
 def cmd_status(args: argparse.Namespace) -> None:
@@ -225,11 +268,11 @@ def cmd_status(args: argparse.Namespace) -> None:
     if later:
         print(f"未到期（{len(later)}）")
         for days, topic, card, _ in later:
-            print(f"  {topic:<{width}}{card.due.astimezone():%m-%d}（{days} 天后）")
+            print(f"  {topic:<{width}}{due_day(card):%m-%d}（{days} 天后）")
     if paused:
         print(f"已暂停（{len(paused)}）")
         for topic, since, card in paused:
-            print(f"  {topic:<{width}}{since.astimezone():%m-%d} 起暂停，原计划：{schedule_text(card)}")
+            print(f"  {topic:<{width}}{study_day(since):%m-%d} 起暂停，原计划：{schedule_text(card)}")
     if fresh:
         print(f"未开始（{len(fresh)}）")
         print("  " + "  ".join(fresh))
@@ -254,6 +297,15 @@ def cmd_start(args: argparse.Namespace) -> None:
     solution = solution_path(topic)
     stub = TOPICS / topic / "stub.py"
 
+    # 同一时间只记录一次手写。开始另一道题会覆盖进行中那一次的开始时间和测试记录。
+    session = load_session()
+    if session and session["topic"] != topic and not args.force:
+        die(
+            f"{session['topic']} 的手写还在进行中，开始另一道题会丢掉它的开始时间和测试记录。\n"
+            f"先把它写完，运行 drill done（写不出来就运行 drill done --giveup）；\n"
+            f"如果确定不要那一次的记录，加 --force。已经写下的代码不受影响。"
+        )
+
     # 重置会覆盖实现文件。已提交的旧版本在 git 历史里是安全的，未提交的改动则会丢失。
     if solution.exists() and solution.read_bytes() != stub.read_bytes():
         dirty = git("status", "--porcelain", "--", str(solution)).stdout.strip()
@@ -265,7 +317,7 @@ def cmd_start(args: argparse.Namespace) -> None:
             )
 
     shutil.copyfile(stub, solution)
-    save_session({"topic": topic, "started_at": now().isoformat(), "first_run_passed": None})
+    save_session({"topic": topic, "started_at": now().isoformat(), "first_run_passed": None, "failed_runs": 0})
     readme = TOPICS / topic / "README.md"
     print(f"已重置 {solution.relative_to(ROOT)}，开始计时。")
     print(f"  要求：{readme.relative_to(ROOT)}")
@@ -277,14 +329,17 @@ def cmd_start(args: argparse.Namespace) -> None:
 # ---------- 测试与完成 ----------
 
 def run_tests(topic: str) -> bool:
-    """跑该题目的测试，并记下本次手写的第一次测试是否通过。"""
+    """跑该题目的测试，并记下本次手写的第一次测试是否通过、一共失败过几次。"""
     result = subprocess.run([sys.executable, "-m", "pytest", str(TOPICS / topic)], cwd=ROOT)
     if result.returncode == 5:
         die(f"topics/{topic} 下没有收集到任何测试。")
     passed = result.returncode == 0
     session = load_session()
-    if session and session["topic"] == topic and session["first_run_passed"] is None:
-        session["first_run_passed"] = passed
+    if session and session["topic"] == topic:
+        if session["first_run_passed"] is None:
+            session["first_run_passed"] = passed
+        if not passed:
+            session["failed_runs"] = session.get("failed_runs", 0) + 1
         save_session(session)
     return passed
 
@@ -294,11 +349,10 @@ def cmd_check(args: argparse.Namespace) -> None:
     sys.exit(0 if run_tests(topic) else 1)
 
 
-def ask_peeked() -> bool:
+def ask(question: str, flag: str, meaning: str) -> bool:
     if not sys.stdin.isatty():
-        die("无法交互提问，请加 --peeked 或 --no-peeked 说明这次是否看过参考。")
-    answer = input("这次是否看过参考（旧代码、参考实现、资料、AI 提示）？[y/N] ").strip().lower()
-    return answer in {"y", "yes", "是"}
+        die(f"无法交互提问，请加 --{flag} 或 --no-{flag} 说明{meaning}。")
+    return input(f"{question} [y/N] ").strip().lower() in {"y", "yes", "是"}
 
 
 def cmd_done(args: argparse.Namespace) -> None:
@@ -318,15 +372,30 @@ def cmd_done(args: argparse.Namespace) -> None:
             "如果确实想不起来，运行 drill done --giveup 如实记录，之后会打开参考实现供对照。"
         )
 
-    # 评分由客观事实推出，不需要自己斟酌：
-    #   看过参考或放弃 → again；独立写出但第一次测试没过 → hard；独立写出且一次通过 → good
+    # 评分由事实推出：
+    #   看过参考或放弃 → again；
+    #   独立写出，但出过概念性错误（算法、公式、定义写错，由测试或写完后的对照发现）→ hard；
+    #   独立写出，没有出错，或只有笔误、接口细节之类的小错 → good。
+    # 测试失败本身不降级，否则会让人不敢随手跑测试。easy 只能用 --rating 手动指定。
+    failed_runs = session.get("failed_runs", 0)
+    peeked, conceptual = args.peeked, args.conceptual
     if args.rating:
         rating = args.rating
     elif not passed:
         rating = "again"
     else:
-        peeked = args.peeked if args.peeked is not None else ask_peeked()
-        rating = "again" if peeked else ("good" if session["first_run_passed"] else "hard")
+        if peeked is None:
+            peeked = ask("这次是否看过参考（旧代码、参考实现、资料、AI 提示）？", "peeked", "这次是否看过参考")
+        if peeked:
+            rating = "again"
+        else:
+            if conceptual is None and failed_runs > 0:
+                conceptual = ask(
+                    f"测试失败过 {failed_runs} 次。其中有没有概念性错误（算法、公式、定义写错，而不是笔误或接口细节）？",
+                    "conceptual", "这次是否出过概念性错误")
+            # 测试没有失败过、也没有用参数指明时，按没有概念性错误评分，但 conceptual 保持为 None，
+            # 不写进记录：失败次数只统计经过 drill 跑的测试，没有问过就不能当作确认过的事实。
+            rating = "hard" if conceptual else "good"
 
     finished = now()
     minutes = round((finished - datetime.fromisoformat(session["started_at"])).total_seconds() / 60)
@@ -334,17 +403,26 @@ def cmd_done(args: argparse.Namespace) -> None:
         "topic": topic,
         "time": finished.isoformat(timespec="seconds"),
         "rating": rating,
-        "passed": passed,
+        "passed": passed,  # 为 False 表示放弃
         "first_run_passed": bool(session["first_run_passed"]),
+        "failed_runs": failed_runs,
         "minutes": minutes,
     }
+    # 评分所依据的事实也一并记下，以后调整评分规则时可以按新规则重新判定。没有问到的不记。
+    if peeked is not None:
+        record["peeked"] = peeked
+    if conceptual is not None:
+        record["conceptual"] = conceptual
     append_log(record)
     SESSION.unlink()
 
     log = load_log()
     card, history = card_of(topic, log)
-    print(f"\n评分 {rating}，用时 {minutes} 分钟，这是第 {len(history)} 次。")
-    print(f"下次复习：{card.due.astimezone():%Y-%m-%d}（{days_until_due(card)} 天后）")
+    if is_first_learning(history):
+        print(f"\n首次学习，用时 {minutes} 分钟。这一次不参与间隔推算，下一次从空白独立重写时才开始评分。")
+    else:
+        print(f"\n评分 {rating}，用时 {minutes} 分钟，这是第 {len(history)} 次。")
+    print(f"下次复习：{due_day(card):%Y-%m-%d}（{days_until_due(card)} 天后）")
     if paused_since(topic, log) is not None:
         print(f"这道题仍处于暂停状态，到期时不会提醒。恢复：uv run drill resume {topic}")
 
@@ -386,7 +464,7 @@ def set_paused(args: argparse.Namespace, pause: bool) -> None:
         if topic not in written:
             print(f"{topic}：还没写过，没有复习计划，不需要{verb}。")
         elif pause and topic in paused:
-            print(f"{topic}：{paused_since(topic, log).astimezone():%Y-%m-%d} 起已经暂停。")
+            print(f"{topic}：{study_day(paused_since(topic, log)):%Y-%m-%d} 起已经暂停。")
         elif not pause and topic not in paused:
             print(f"{topic}：没有暂停。")
         else:
@@ -527,7 +605,8 @@ def main() -> None:
 
     p = sub.add_parser("start", help="开始一次手写：把实现文件重置为空白骨架")
     p.add_argument("topic", nargs="?", help="省略则自动选逾期最久的题目")
-    p.add_argument("--force", action="store_true", help="丢弃实现文件中未提交的改动")
+    p.add_argument("--force", action="store_true",
+                   help="丢弃实现文件中未提交的改动；另一道题的手写还在进行时，放弃那一次的记录")
     p.set_defaults(func=cmd_start)
 
     p = sub.add_parser("check", help="只跑测试，不记录不提交")
@@ -538,6 +617,8 @@ def main() -> None:
     p.add_argument("topic", nargs="?")
     p.add_argument("--peeked", action=argparse.BooleanOptionalAction, default=None,
                    help="这次是否看过参考；省略则交互提问")
+    p.add_argument("--conceptual", action=argparse.BooleanOptionalAction, default=None,
+                   help="这次是否出过概念性错误（算法、公式、定义写错）；省略时，测试失败过才交互提问")
     p.add_argument("--giveup", action="store_true", help="测试没过也如实记录为 again")
     p.add_argument("--rating", choices=list(RATINGS), help="手动指定评分，覆盖自动判定")
     p.add_argument("--no-open", action="store_true", help="完成后不自动打开对比")
