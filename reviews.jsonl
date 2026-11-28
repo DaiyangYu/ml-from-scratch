@@ -5,3 +5,4 @@
 {"topic": "auc", "time": "2026-11-27T07:43:08+00:00", "rating": "good", "passed": true, "first_run_passed": true, "failed_runs": 0, "minutes": 17, "peeked": false}
 {"topic": "logistic_regression", "time": "2026-11-27T08:11:44+00:00", "rating": "hard", "passed": true, "first_run_passed": false, "failed_runs": 4, "minutes": 21, "peeked": false, "conceptual": true}
 {"topic": "fm", "time": "2026-11-28T01:32:49+00:00", "rating": "hard", "passed": true, "first_run_passed": false, "failed_runs": 3, "minutes": 28, "peeked": false, "conceptual": true}
+{"topic": "logistic_regression", "time": "2026-11-28T02:21:59+00:00", "rating": "hard", "passed": true, "first_run_passed": false, "failed_runs": 1, "minutes": 49, "peeked": false, "conceptual": true}
